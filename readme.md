@@ -232,4 +232,58 @@ For pull requests, editor preferences are available in the [editor config](.edit
 
 Finally it should work!!
 
-
+Jenkins Pipeline configuration..
+pipeline {
+    agent any
+    stages {
+        stage('GIT') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Vijetha-A/spring-framework-petclinic-war.git'
+            }
+        }
+        stage('package') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('sonarqube') {
+            steps {
+                withSonarQubeEnv(installationName: 'sonarqube', credentialsId: 'Jenkins-sonar-token' )
+                {
+                    sh 'mvn verify sonar:sonar'
+                }
+            }
+        }
+        stage('Nexus') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'spring-framework-petclinic', 
+                classifier: '',
+                file: 'target/petclinic.war', 
+                type: 'war']], 
+                credentialsId: '002', 
+                groupId: 'org.springframework.samples', 
+                nexusUrl: '172.31.58.8:8081', 
+                nexusVersion: 'nexus3', 
+                protocol: 'http', 
+                repository: 'petclinic-repo', 
+                version: '6.2.3'
+            }
+        }
+        stage('Tomcat') {
+            steps {
+                sshagent(['003']) {
+                sh 'scp -o StrictHostKeyChecking=no target/petclinic.war ubuntu@172.31.56.7://home/ubuntu/apache-tomcat-10.1.50/webapps'
+                }
+            }
+        }
+    }
+    post{
+            success{
+                mail bcc: '', 
+                body: 'Your job is success', 
+                cc: 'vijethavaiholli@gmail.com', 
+                subject: 'Job success', 
+                to: 'vijethavaiholli@gmail.com'
+            }
+    }
+}
